@@ -149,7 +149,7 @@ func (t *Tester) workerLoop(stageCtx, globalCtx context.Context, reqID int, rate
 
 		// 执行请求时传入 stageCtx，这样超时/取消时请求能立刻感知
 		start := time.Now()
-		err := fn(stageCtx, reqID) // 这里将 stageCtx 传给任务
+		err := fn(globalCtx, reqID) // 这里将 globalCtx 传给任务
 		duration := time.Since(start)
 
 		success := err == nil

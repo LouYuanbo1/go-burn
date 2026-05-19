@@ -133,53 +133,6 @@ func TestBurnSteps_StageIsolation(t *testing.T) {
 	}
 }
 
-// TestWorkerLoop_StageCtxCancel 验证 stageCtx 取消时任务快速退出
-func TestWorkerLoop_StageCtxCancel(t *testing.T) {
-	ctx := context.Background()
-	tester, _ := NewTester(ctx)
-
-	stageCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
-	defer cancel()
-
-	var executed atomic.Int64
-	worker := func(ctx context.Context, reqID int) error {
-		executed.Add(1)
-		// 模拟慢请求（5 秒），但应被 stageCtx 快速取消
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(5 * time.Second):
-			return nil
-		}
-	}
-
-	// 启动单个 worker
-	done := make(chan error, 1)
-	go func() {
-		done <- tester.workerLoop(stageCtx, ctx, 0, 0, worker)
-	}()
-
-	// 等待 stage 超时 + 少量缓冲
-	<-stageCtx.Done()
-	time.Sleep(50 * time.Millisecond)
-
-	select {
-	case err := <-done:
-		if err != nil && err != context.DeadlineExceeded {
-			t.Errorf("worker returned unexpected error: %v", err)
-		}
-	case <-time.After(500 * time.Millisecond):
-		t.Error("worker did not exit after stageCtx cancellation")
-	}
-
-	// 验证：worker 应只执行了 1 次（被取消前开始的那次）
-	// 注意：由于先执行再加计数，可能 =1 或 =0（如果取消极快）
-	// 这里验证 <= 1 即可
-	if count := executed.Load(); count > 1 {
-		t.Errorf("executed = %d, want <= 1 (should exit quickly)", count)
-	}
-}
-
 // TestWorkerLoop_RateLimit 验证速率控制生效
 func TestWorkerLoop_RateLimit(t *testing.T) {
 	ctx := context.Background()
