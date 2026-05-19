@@ -2,6 +2,7 @@ package burn
 
 import (
 	"context"
+	"errors"
 	"log"
 	"os"
 	"sync"
@@ -41,11 +42,10 @@ func NewTester(ctx context.Context, options ...OptionFunc) (*Tester, context.Con
 
 // BurnSteps 多阶段渐进式压测（核心方法）
 func (t *Tester) BurnSteps(ctx context.Context, steps []StepConfig,
-	fn func(ctx context.Context, reqID int) error) {
+	fn func(ctx context.Context, reqID int) error) error {
 
 	if len(steps) == 0 {
-		t.logger.Println("⚠️  未配置压测阶段")
-		return
+		return errors.New("未配置压测阶段")
 	}
 
 	var reqID int64
@@ -62,7 +62,7 @@ func (t *Tester) BurnSteps(ctx context.Context, steps []StepConfig,
 		select {
 		case <-ctx.Done():
 			t.logger.Println("🛑 压测被取消")
-			return
+			return nil
 		default:
 		}
 
@@ -91,6 +91,9 @@ func (t *Tester) BurnSteps(ctx context.Context, steps []StepConfig,
 		<-stageCtx.Done()
 		stageCancel()
 
+		// 等待本阶段所有 worker 真正退出，确保并发数不会叠加到下一阶段
+		wg.Wait()
+
 		stageElapsed := time.Since(stageStart)
 		stats := t.Stats()
 		total := atomic.LoadInt64(&stats.TotalRequests)
@@ -100,18 +103,16 @@ func (t *Tester) BurnSteps(ctx context.Context, steps []StepConfig,
 			idx+1, stageElapsed.Round(time.Second), total,
 			float64(success)/float64(total)*100)
 
-		// 等待本阶段所有 worker 真正退出，确保并发数不会叠加到下一阶段
-		wg.Wait()
-
 		// 阶段间隔
 		select {
 		case <-time.After(1 * time.Second):
 		case <-ctx.Done():
-			return
+			return nil
 		}
 	}
 
 	t.logger.Println("\n🏁 所有阶段执行完成")
+	return nil
 }
 
 // workerLoop 单协程工作循环（修复：将 stageCtx 传入 fn）
@@ -137,6 +138,7 @@ func (t *Tester) workerLoop(stageCtx, globalCtx context.Context, reqID int, rate
 		// 速率控制
 		if ticker != nil {
 			select {
+			// 等待 ticker 触发（每 rateLimit 秒执行一次）
 			case <-ticker.C:
 			case <-stageCtx.Done():
 				return nil
