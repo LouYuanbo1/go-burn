@@ -92,7 +92,7 @@ func TestTester(t *testing.T) {
 		"",
 	)
 
-	tester.BurnSteps(ctx, steps, worker)
+	tester.BurnSteps(ctx, 5*time.Second, steps, worker)
 
 	if err := tester.Wait(); err != nil && err != context.Canceled {
 		logger.Printf("⚠️  压测异常退出: %v", err)

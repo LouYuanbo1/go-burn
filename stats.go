@@ -13,6 +13,12 @@ import (
 
 // ==================== 统计模块 ====================
 
+type Record struct {
+	Timestamp time.Time
+	Latency   time.Duration
+	Success   bool
+}
+
 // Stats 压测统计指标（并发安全）
 type Stats struct {
 	TotalRequests int64
@@ -21,6 +27,7 @@ type Stats struct {
 	TotalDuration atomic.Int64 // 改用原子类型，避免 data race
 	mu            sync.Mutex
 	latencies     []time.Duration
+	records       []Record
 	startTime     time.Time
 }
 
@@ -28,6 +35,7 @@ func NewStats() *Stats {
 	return &Stats{
 		startTime: time.Now(),
 		latencies: make([]time.Duration, 0, 10000),
+		records:   make([]Record, 0, 10000),
 	}
 }
 
@@ -42,6 +50,11 @@ func (s *Stats) Record(duration time.Duration, success bool) {
 	s.TotalDuration.Add(int64(duration))
 	s.mu.Lock()
 	s.latencies = append(s.latencies, duration)
+	s.records = append(s.records, Record{
+		Timestamp: time.Now(),
+		Latency:   duration,
+		Success:   success,
+	})
 	s.mu.Unlock()
 }
 
@@ -90,16 +103,31 @@ func (s *Stats) ExportCSV(filename string) error {
 	}
 	defer file.Close()
 
-	fmt.Fprintf(file, "timestamp_ms,latency_ms,success\n")
-
+	// 复制记录后释放锁，避免在 I/O 期间持有锁
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	recordsCopy := make([]Record, len(s.records))
+	copy(recordsCopy, s.records)
+	s.mu.Unlock()
 
-	baseTime := s.startTime.UnixMilli()
-	for _, lat := range s.latencies {
-		fmt.Fprintf(file, "%d,%.2f,true\n", baseTime, lat.Seconds()*1000)
+	// 写入 CSV 头
+	if _, err = fmt.Fprintf(file, "timestamp_ms,latency_ms,success\n"); err != nil {
+		return fmt.Errorf("write header: %w", err)
 	}
 
-	log.Printf("📁 结果已导出: %s", filename)
+	for _, rec := range recordsCopy {
+		successStr := "false"
+		if rec.Success {
+			successStr = "true"
+		}
+		if _, err = fmt.Fprintf(file, "%d,%.2f,%s\n",
+			rec.Timestamp.UnixMilli(),
+			rec.Latency.Seconds()*1000,
+			successStr,
+		); err != nil {
+			return fmt.Errorf("write record: %w", err)
+		}
+	}
+
+	log.Printf("📁 结果已导出: %s (%d 条记录)", filename, len(recordsCopy))
 	return nil
 }
