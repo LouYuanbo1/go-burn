@@ -41,7 +41,7 @@ func NewTester(ctx context.Context, options ...OptionFunc) (*Tester, context.Con
 }
 
 // BurnSteps 多阶段渐进式压测（核心方法）
-func (t *Tester) BurnSteps(ctx context.Context, steps []StepConfig,
+func (t *Tester) BurnSteps(ctx context.Context, intervalMonitor time.Duration, steps []StepConfig,
 	fn func(ctx context.Context, reqID int) error) error {
 
 	if len(steps) == 0 {
@@ -54,7 +54,7 @@ func (t *Tester) BurnSteps(ctx context.Context, steps []StepConfig,
 	// 启动实时监控协程（使用全局 ctx）
 	monitorCtx, monitorCancel := context.WithCancel(ctx)
 	defer monitorCancel()
-	go t.monitorProgress(monitorCtx)
+	go t.monitorProgress(monitorCtx, intervalMonitor)
 
 	t.logger.Printf("🔥 开始阶梯压测: %d 个阶段", len(steps))
 
@@ -162,8 +162,8 @@ func (t *Tester) workerLoop(stageCtx, globalCtx context.Context, reqID int, rate
 }
 
 // monitorProgress 实时进度监控（原子读取字段）
-func (t *Tester) monitorProgress(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Second)
+func (t *Tester) monitorProgress(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	var lastTotal int64

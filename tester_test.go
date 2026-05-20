@@ -82,7 +82,7 @@ func TestBurnSteps_SingleStage(t *testing.T) {
 		{Concurrency: 5, Duration: 1 * time.Second, RateLimit: 10},
 	}
 
-	tester.BurnSteps(ctx, steps, countCallsWorker(&callCount, 0))
+	tester.BurnSteps(ctx, 5*time.Second, steps, countCallsWorker(&callCount, 0))
 	_ = tester.Wait()
 
 	// 5 并发 × 1 秒 × 10 QPS 限 = 最多 50 次，但受 10ms 任务延迟限制
@@ -123,7 +123,7 @@ func TestBurnSteps_StageIsolation(t *testing.T) {
 		{Concurrency: 20, Duration: 500 * time.Millisecond, RateLimit: 0}, // 关键：验证不会 10+20=30
 	}
 
-	tester.BurnSteps(ctx, steps, worker)
+	tester.BurnSteps(ctx, 5*time.Second, steps, worker)
 	_ = tester.Wait()
 
 	// 峰值并发应该 ≈ 20（第二阶段），而不是 30
@@ -250,7 +250,7 @@ func TestBurnSteps_GracefulCancel(t *testing.T) {
 		cancel()
 	}()
 
-	tester.BurnSteps(ctx, steps, worker)
+	tester.BurnSteps(ctx, 5*time.Second, steps, worker)
 	err := tester.Wait()
 
 	// 验证：应收到取消错误，且任务已停止
@@ -275,7 +275,7 @@ func BenchmarkBurnSteps(b *testing.B) {
 			}
 
 			b.ResetTimer()
-			tester.BurnSteps(ctx, steps, collectLatenciesWorker(10*time.Millisecond, 1*time.Millisecond))
+			tester.BurnSteps(ctx, 5*time.Second, steps, collectLatenciesWorker(10*time.Millisecond, 1*time.Millisecond))
 			_ = tester.Wait()
 			b.StopTimer()
 		})
