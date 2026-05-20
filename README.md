@@ -70,7 +70,7 @@ func main() {
     }
 
     // 执行多阶段压测
-    tester.BurnSteps(ctx, steps, taskFn)
+    tester.BurnSteps(ctx, 5*time.Sencond, steps, taskFn)
 
     // 等待压测完成
     if err := tester.Wait(); err != nil && err != context.Canceled {
@@ -166,7 +166,7 @@ if err != nil {
   - `RateLimit int` - 单协程速率限制（0为无限制）
 
 - `Tester` - 主要的压测器类型
-  - `BurnSteps(ctx context.Context, steps []StepConfig, fn func(ctx context.Context, reqID int) error)` - 执行多阶段压测
+  - `BurnSteps(ctx context.Context,intervalMonitor time.Duration, steps []StepConfig, fn func(ctx context.Context, reqID int) error)` - 执行多阶段压测
   - `Stats() *Stats` - 获取统计信息
   - `Wait()` - 等待压测完成
 
