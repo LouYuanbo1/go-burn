@@ -86,6 +86,8 @@ func (s *Stats) Report() {
 	fmt.Printf("  成功:      %d (%.2f%%)\n", atomic.LoadInt64(&s.Success), float64(atomic.LoadInt64(&s.Success))/float64(total)*100)
 	fmt.Printf("  失败:      %d (%.2f%%)\n", atomic.LoadInt64(&s.Failed), float64(atomic.LoadInt64(&s.Failed))/float64(total)*100)
 	fmt.Printf("  平均 QPS:  %.2f\n", qps)
+	fmt.Printf("  平均正确QPS: %.2f\n", float64(atomic.LoadInt64(&s.Success))/elapsed.Seconds())
+	fmt.Printf("  平均错误QPS: %.2f\n", float64(atomic.LoadInt64(&s.Failed))/elapsed.Seconds())
 	fmt.Printf("  平均延迟:  %v\n", avgLatency.Round(time.Millisecond))
 	if len(latencies) > 0 {
 		fmt.Printf("  P50 延迟:  %v\n", latencies[len(latencies)*50/100])
