@@ -14,7 +14,7 @@ func TestStats_Record_Concurrent(t *testing.T) {
 	const recordsPerGoroutine = 50
 
 	var wg sync.WaitGroup
-	for g := 0; g < goroutines; g++ {
+	for g := range goroutines {
 		wg.Add(1)
 		go func(gid int) {
 			defer wg.Done()
@@ -102,7 +102,7 @@ func TestStats_ExportCSV(t *testing.T) {
 // BenchmarkStats_Record 基准测试：单协程记录性能
 func BenchmarkStats_Record(b *testing.B) {
 	stats := NewStats()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		stats.Record(100*time.Millisecond, true)
 	}
 }
